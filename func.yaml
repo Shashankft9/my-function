@@ -1,0 +1,29 @@
+version: 0.19.0
+name: my-function
+namespace: ""
+runtime: go
+registry: ""
+image: docker.io/shashankft/my-function:latest
+imageDigest: ""
+build: git
+git:
+  url: https://github.com/Shashankft9/my-function.git
+  revision: master
+builder: gcr.io/paketo-buildpacks/builder:base
+builders:
+  base: gcr.io/paketo-buildpacks/builder:base
+  default: gcr.io/paketo-buildpacks/builder:base
+  full: gcr.io/paketo-buildpacks/builder:full
+buildpacks:
+- paketo-buildpacks/go-dist
+- ghcr.io/boson-project/go-function-buildpack:tip
+volumes: []
+buildEnvs: []
+envs: []
+annotations: {}
+options: {}
+labels: []
+healthEndpoints:
+  liveness: /health/liveness
+  readiness: /health/readiness
+created: 2022-02-02T02:22:54.091507853-05:00

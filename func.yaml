@@ -9,7 +9,7 @@ build: git
 git:
   url: https://github.com/Shashankft9/my-function.git
   revision: master
-builder: gcr.io/paketo-buildpacks/builder:base
+builder: ghcr.io/boson-project/go-function-builder:tip
 builders:
   base: gcr.io/paketo-buildpacks/builder:base
   default: gcr.io/paketo-buildpacks/builder:base

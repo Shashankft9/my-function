@@ -3,7 +3,7 @@ name: my-function
 namespace: ""
 runtime: go
 registry: ""
-image: docker.io/shashankft/my-function:latest
+image: ""
 imageDigest: ""
 build: git
 git:

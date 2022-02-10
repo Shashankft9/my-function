@@ -3,8 +3,8 @@ name: my-function
 namespace: ""
 runtime: go
 registry: ""
-image: ""
-imageDigest: ""
+image: docker.io/shashankft/my-function:latest
+imageDigest: sha256:17b69b427d839d6c0c06c66374b39c211b40cb97ebe485973f62f47b4f44b153
 build: git
 git:
   url: https://github.com/Shashankft9/my-function.git

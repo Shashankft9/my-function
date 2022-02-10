@@ -1,0 +1,174 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  labels:
+    function.knative.dev/name: my-function
+  name: my-function-git-pipeline
+  namespace: default
+spec:
+  params:
+  - default: https://github.com/Shashankft9/function-go.git
+    description: Git repository that hosts the function project
+    name: gitRepository
+    type: string
+  - description: Git revision to build
+    name: gitRevision
+    type: string
+  - default: ""
+    description: Path where the function project is
+    name: contextDir
+    type: string
+  - description: Function image name
+    name: imageName
+    type: string
+  - description: Buildpacks builder image to be used
+    name: builderImage
+    type: string
+  tasks:
+  - name: fetch-repository
+    params:
+    - name: url
+      value: $(params.gitRepository)
+    - name: revision
+      value: $(params.gitRevision)
+    taskRef:
+      kind: Task
+      name: git-clone
+    workspaces:
+    - name: output
+      workspace: source-workspace
+    - name: basic-auth
+      workspace: func-priv-build
+  - name: backup
+    runAfter:
+    - fetch-repository
+    taskSpec:
+      spec: null
+      steps:
+      - image: docker.io/library/bash:5.1.4@sha256:b208215a4655538be652b2769d82e576bc4d0a2bb132144c060efc5be8c3f5d6
+        name: copy
+        script: |
+          #!/usr/bin/env bash
+          set -e
+          echo $(find . -name func.yaml)
+          cd workspace/source
+          echo $(ls)
+          echo "Copying files"
+          cp -r /workspace/source/* /workspace/source-backup
+          cd /workspace/source-backup
+          echo $(ls)
+      workspaces:
+      - name: source
+      - name: source-backup
+    workspaces:
+    - name: source
+      workspace: source-workspace
+    - name: source-backup
+      workspace: source-backup-workspace
+  - name: build
+    params:
+    - name: APP_IMAGE
+      value: $(params.imageName)
+    - name: SOURCE_SUBPATH
+      value: $(params.contextDir)
+    - name: BUILDER_IMAGE
+      value: $(params.builderImage)
+    runAfter:
+    - backup
+    taskRef:
+      kind: Task
+      name: buildpacks
+    workspaces:
+    - name: source
+      workspace: source-workspace
+    - name: cache
+      workspace: cache-workspace
+  - name: restore
+    runAfter:
+    - build
+    taskSpec:
+      spec: null
+      steps:
+      - image: docker.io/library/bash:5.1.4@sha256:b208215a4655538be652b2769d82e576bc4d0a2bb132144c060efc5be8c3f5d6
+        name: copy
+        script: |
+          #!/usr/bin/env bash
+          set -e
+          echo $(find . -name func.yaml)
+          cd /workspace/source-backup
+          echo $(ls)
+          cd /workspace
+          echo $(ls)
+          echo "Restoring files"
+          cp -r /workspace/source-backup/* /workspace/source
+          cd /workspace/source
+          echo $(ls)
+      workspaces:
+      - name: source
+      - name: source-backup
+    workspaces:
+    - name: source
+      workspace: source-workspace
+    - name: source-backup
+      workspace: source-backup-workspace
+  - name: image-digest
+    params:
+    - name: image
+      value: $(params.imageName)
+    - name: digest
+      value: $(tasks.build.results.APP_IMAGE_DIGEST)
+    - name: contextDir
+      value: $(params.contextDir)
+    runAfter:
+    - build
+    taskSpec:
+      params:
+      - name: image
+        type: string
+      - name: digest
+        type: string
+      - name: contextDir
+        type: string
+      spec: null
+      steps:
+      - image: docker.io/library/bash:5.1.4@sha256:b208215a4655538be652b2769d82e576bc4d0a2bb132144c060efc5be8c3f5d6
+        name: print
+        script: |
+          #!/usr/bin/env bash
+          set -e
+          echo $(find . -name func.yaml)
+          cd workspace/source
+          echo $(ls)
+      - image: docker.io/library/bash:5.1.4@sha256:b208215a4655538be652b2769d82e576bc4d0a2bb132144c060efc5be8c3f5d6
+        name: ""
+        script: "#!/usr/bin/env bash\nset -e\n\nfunc_file=\"$(workspaces.source.path)/func.yaml\"\nif
+          [ \"$(params.contextDir)\" != \"\" ]; then\n  func_file=\"/workspace/source/$(params.contextDir)/func.yaml\"\nfi\n\nsed
+          -i \"s|^image:.*$|image: $(params.image)|\" \"$func_file\"\necho \"Function
+          image name: $(params.image)\"\n\nsed -i \"s/^imageDigest:.*$/imageDigest:
+          $(params.digest)/\" \"$func_file\"\necho \"Function image digest: $(params.digest)\"\n\t"
+      workspaces:
+      - name: source
+    workspaces:
+    - name: source
+      workspace: source-workspace
+  - name: deploy
+    params:
+    - name: path
+      value: $(workspaces.source.path)/$(params.contextDir)
+    runAfter:
+    - image-digest
+    taskRef:
+      kind: Task
+      name: func-deploy
+    workspaces:
+    - name: source
+      workspace: source-workspace
+  workspaces:
+  - description: Directory where function source is located.
+    name: source-workspace
+  - description: Directory where Buildpacks cache is stored
+    name: cache-workspace
+  - description: Holds private credentials for git repo
+    name: func-priv-build
+  - description: Directory where function source is backed up.
+    name: source-backup-workspace

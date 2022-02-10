@@ -1,0 +1,40 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  labels:
+    function.knative.dev/name: my-function
+    tekton.dev/pipeline: my-function-git-pipeline
+  name: my-function-git-pipeline-run-wzw7g
+  namespace: default
+spec:
+  params:
+  - name: gitRepository
+    value: https://github.com/Shashankft9/my-function.git
+  - name: gitRevision
+    value: master
+  - name: contextDir
+    value: ""
+  - name: imageName
+    value: docker.io/shashankft/my-function:latest
+  - name: builderImage
+    value: ghcr.io/boson-project/go-function-builder:tip
+  pipelineRef:
+    name: my-function-git-pipeline
+  serviceAccountName: my-function-git-pipeline-builder-secret
+  timeout: 1h0m0s
+  workspaces:
+  - name: source-workspace
+    persistentVolumeClaim:
+      claimName: my-function-git-pipeline-pvc
+    subPath: source
+  - name: source-backup-workspace
+    persistentVolumeClaim:
+      claimName: my-function-git-pipeline-pvc
+    subPath: source-backup
+  - name: cache-workspace
+    persistentVolumeClaim:
+      claimName: my-function-git-pipeline-pvc
+    subPath: cache
+  - name: func-priv-build
+    secret:
+      secretName: func-cred
